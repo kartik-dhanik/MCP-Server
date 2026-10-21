@@ -1,4 +1,3 @@
-
 import os
 import json
 import math
@@ -9,10 +8,14 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 
-# Set this environment variable to your exact Azure Container Apps hostname
-# after deployment, for example:
-# data-quality-mcp-server.<generated-suffix>.centralindia.azurecontainerapps.io
-AZURE_APP_HOST = os.environ.get("AZURE_APP_HOST", "").strip()
+# Azure Container Apps hostname.
+# Set AZURE_APP_HOST to the hostname only,
+# without https:// or /mcp.
+AZURE_APP_HOST = os.environ.get(
+    "AZURE_APP_HOST", ""
+).strip()
+
+PORT = int(os.environ.get("PORT", "8000"))
 
 allowed_hosts = [
     "127.0.0.1:*",
@@ -26,8 +29,13 @@ if AZURE_APP_HOST:
     ])
 
 
+# FastMCP server configuration.
+# Host and port belong in the constructor,
+# not in mcp.run().
 mcp = FastMCP(
     "Data Quality MCP Server",
+    host="0.0.0.0",
+    port=PORT,
     transport_security=TransportSecuritySettings(
         allowed_hosts=allowed_hosts,
         allowed_origins=[],
@@ -99,8 +107,9 @@ def profile_dataset(records: list[dict[str, Any]]) -> dict:
     """
     Profile a dataset represented as a list of JSON records.
 
-    Returns row counts, columns, missing values, duplicate rows,
-    and numeric statistics for each numeric column.
+    Returns row counts, columns, missing values,
+    duplicate rows, and numeric statistics
+    for each numeric column.
     """
     if not records:
         return {
@@ -118,19 +127,27 @@ def profile_dataset(records: list[dict[str, Any]]) -> dict:
     missing_values = {
         column: sum(
             1 for record in records
-            if column not in record or record[column] is None
+            if column not in record
+            or record[column] is None
         )
         for column in columns
     }
 
     serialized_rows = [
-        json.dumps(record, sort_keys=True, default=str)
+        json.dumps(
+            record,
+            sort_keys=True,
+            default=str
+        )
         for record in records
     ]
 
     row_counts = Counter(serialized_rows)
+
     duplicate_rows = sum(
-        count - 1 for count in row_counts.values() if count > 1
+        count - 1
+        for count in row_counts.values()
+        if count > 1
     )
 
     numeric_summary = {}
@@ -139,8 +156,12 @@ def profile_dataset(records: list[dict[str, Any]]) -> dict:
         values = [
             record[column]
             for record in records
-            if isinstance(record.get(column), (int, float))
-            and not isinstance(record.get(column), bool)
+            if isinstance(
+                record.get(column), (int, float)
+            )
+            and not isinstance(
+                record.get(column), bool
+            )
             and math.isfinite(record[column])
         ]
 
@@ -170,8 +191,12 @@ def filter_records(
     Filter records by exact field-value matches.
 
     Example:
-    filters={"department": "Engineering", "active": True}
-    returns records matching both conditions.
+    filters={
+        "department": "Engineering",
+        "active": True
+    }
+
+    Returns records matching all conditions.
     """
     matched = [
         record for record in records
@@ -197,8 +222,14 @@ def detect_duplicate_records(
     """
     Detect records sharing the same business key.
 
-    Example key_fields=["customer_id"] or
-    ["customer_id", "transaction_date"].
+    Example:
+    key_fields=["customer_id"]
+
+    Or:
+    key_fields=[
+        "customer_id",
+        "transaction_date"
+    ]
     """
     if not key_fields:
         return {
@@ -210,14 +241,18 @@ def detect_duplicate_records(
     for index, record in enumerate(records):
         missing = [
             field for field in key_fields
-            if field not in record or record[field] is None
+            if field not in record
+            or record[field] is None
         ]
 
         if missing:
             continue
 
         key = json.dumps(
-            [record[field] for field in key_fields],
+            [
+                record[field]
+                for field in key_fields
+            ],
             sort_keys=True,
             default=str,
         )
@@ -241,7 +276,8 @@ def detect_duplicate_records(
         "key_fields": key_fields,
         "duplicate_groups": len(duplicates),
         "duplicate_records": sum(
-            len(group["records"]) for group in duplicates
+            len(group["records"])
+            for group in duplicates
         ),
         "duplicates": duplicates,
     }
@@ -253,10 +289,11 @@ def get_column_distribution(
     column: str,
 ) -> dict:
     """
-    Calculate value frequencies for a categorical column.
+    Calculate value frequencies
+    for a categorical column.
 
-    Useful for checking class imbalance, status counts,
-    and category distributions.
+    Useful for checking class imbalance,
+    status counts, and category distributions.
     """
     if not records:
         return {
@@ -273,7 +310,11 @@ def get_column_distribution(
         if value is None:
             label = "<MISSING>"
         else:
-            label = json.dumps(value, sort_keys=True, default=str)
+            label = json.dumps(
+                value,
+                sort_keys=True,
+                default=str
+            )
 
         counts[label] += 1
 
@@ -281,13 +322,19 @@ def get_column_distribution(
         "column": column,
         "total_rows": len(records),
         "distinct_values": len(counts),
-        "value_counts": dict(counts.most_common()),
+        "value_counts": dict(
+            counts.most_common()
+        ),
     }
 
 
-if __name__ == "__main__":
+if __name__ == "_main_":
+    print(
+        f"Starting Data Quality MCP Server "
+        f"on 0.0.0.0:{PORT}",
+        flush=True,
+    )
+
     mcp.run(
-        transport="streamable-http",
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", "8000")),
+        transport="streamable-http"
     )
