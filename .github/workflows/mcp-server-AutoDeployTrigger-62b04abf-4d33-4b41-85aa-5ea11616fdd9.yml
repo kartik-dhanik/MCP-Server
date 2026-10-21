@@ -1,0 +1,49 @@
+name: Trigger auto deployment for mcp-server
+
+# When this action will be executed
+on:
+  # Automatically trigger it when detected changes in repo
+  push:
+    branches: 
+      [ main ]
+    paths:
+    - '**'
+    - '.github/workflows/mcp-server-AutoDeployTrigger-62b04abf-4d33-4b41-85aa-5ea11616fdd9.yml'
+
+  # Allow manual trigger 
+  workflow_dispatch:      
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions: 
+      id-token: write #This is required for requesting the OIDC JWT Token
+      contents: read #Required when GH token is used to authenticate with private repo
+
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.MCPSERVER_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.MCPSERVER_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.MCPSERVER_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push container image to registry
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          appSourcePath: ${{ github.workspace }}
+          _dockerfilePathKey_: _dockerfilePath_
+          _targetLabelKey_: _targetLabel_
+          registryUrl: 
+          registryUsername: ${{ secrets.MCPSERVER_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.MCPSERVER_REGISTRY_PASSWORD }}
+          containerAppName: mcp-server
+          resourceGroup: newfoundary
+          imageToBuild: default/[parameters('containerAppName')]:${{ github.sha }}
+          _buildArgumentsKey_: |
+            _buildArgumentsValues_
+
+
