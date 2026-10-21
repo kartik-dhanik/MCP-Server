@@ -328,7 +328,7 @@ def get_column_distribution(
     }
 
 
-if __name__ == "_main_":
+if __name__ == "__main__":
     print(
         f"Starting Data Quality MCP Server "
         f"on 0.0.0.0:{PORT}",
